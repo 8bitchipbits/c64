@@ -1,0 +1,187 @@
+; Directory list code from SADOTRACKER V1.2 by Lasse Öörni (Cadaver)
+; Prints $ directory straight to screen, not loaded and overwriting basic.
+; Default was to clear screen, change cursor colour and wait for key
+; those removed to print direcory inline
+
+                processor 6502
+                org $C000
+				
+        ;Zeropage variables
+textlo          = $02
+texthi          = $03
+destlo          = $04
+desthi          = $05
+storea          = $06
+storex          = $07
+storey          = $08
+trklo           = $09
+trkhi           = $0a
+temp1           = $fb
+temp2           = $fc
+temp3           = $fd
+temp4           = $fe
+temp5           = $ff
+status          = $90
+fa              = $ba
+
+        ;Kernal routines
+scnkey          = $ff9f
+getin           = $ffe4
+setnam          = $ffbd
+setlfs          = $ffba
+load            = $ffd5
+save            = $ffd8
+chrin           = $ffcf
+open            = $ffc0
+close           = $ffc3
+chkin           = $ffc6
+chkout          = $ffc9
+clrchn          = $ffcc
+chrout          = $ffd2
+plot            = $fff0
+
+crscol			= $0286
+scnctl			= $d011
+
+				        jmp dm_dir
+dir_end:        lda #$02
+                jsr close
+                jsr clrchn
+                rts
+                ;jsr clearscreen
+dm_dir:         lda #$02
+                ldy #$00
+                ldx drivenumber
+                jsr setlfs
+                lda #$01
+                ldx #<dirname
+                ldy #>dirname
+                jsr setnam
+                jsr open
+                ldx #$02
+                jsr chkin
+                ;lda #27 ;%00100111
+                ;sta scnctl ;
+                clc
+                ;ldx #$00
+                ;ldy #$00
+                ;jsr plot
+                ;lda #$0c
+                ;sta crscol ;$0286 ;646 crscol ;current cursor colour
+                jsr chrin
+                jsr chrin
+dir_loop:       lda status
+                bne dir_end
+                jsr chrin
+                cmp #$01
+                bne dir_loop
+                jsr chrin
+                lda status
+                bne dir_end
+                jsr chrin
+                sta trklo
+                jsr chrin
+                sta trkhi
+                lda #$00
+                sta dirprintnum
+                tay
+dir_100loop:    lda trkhi
+                cmp #>100
+                beq dir_100cl
+                bcs dir_100ok
+                bcc dir_100quit
+dir_100cl:      lda trklo
+                cmp #<100
+                bcs dir_100ok
+                bcc dir_100quit
+dir_100ok:      iny
+                sec
+                lda trklo
+                sbc #<100
+                sta trklo
+                lda trkhi
+                sbc #>100
+                sta trkhi
+                jmp dir_100loop
+dir_100quit:    tya
+                clc
+                adc #"0"
+                cmp #"0"
+                beq dir_10
+                jsr chrout
+                inc dirprintnum
+dir_10:         ldy #$00
+dir_10loop:     lda trkhi
+                cmp #>10
+                beq dir_10cl
+                bcs dir_10ok
+                bcc dir_10quit
+dir_10cl:       lda trklo
+                cmp #<10
+                bcs dir_10ok
+                bcc dir_10quit
+dir_10ok:       iny
+                sec
+                lda trklo
+                sbc #<10
+                sta trklo
+                lda trkhi
+                sbc #>10
+                sta trkhi
+                jmp dir_10loop
+dir_10quit:     tya
+                clc
+                adc #"0"
+                ldy dirprintnum
+                bne dir_10pr
+                cmp #"0"
+                beq dir_10np
+dir_10pr:       jsr chrout
+dir_10np:       lda trklo
+                clc
+                adc #"0" ; display 0 padding on blocks
+                jsr chrout
+                lda #$20 ; blocks
+                jsr chrout
+dir_loop3:      lda status
+                bne dir_end2
+                jsr chrin
+                cmp #$00
+                bne dir_noline
+                lda #13 ; newline $0d
+                jsr chrout
+                jmp dir_loop
+dir_noline:     jsr chrout
+                jmp dir_loop3
+dir_end2:       jmp dir_end
+getkey_delay:   ldy #4
+gkd1:           ldx #$ff
+gkd2:           dex
+                bne gkd2
+                dey
+                bne gkd1
+                rts
+waitkey:        jsr getkey_delay
+                jsr getkey_delay
+                jsr scnkey
+                jsr getin
+                cmp #$00
+                beq waitkey
+                rts
+dirname:        dc.b "$"
+filebuffer:     ds.b 32,0
+dirprintnum:    dc.b 0
+scratch:        dc.b "S0:"
+name:           dc.b "                ",0
+namelength:     dc.b 0
+drivenumber:    dc.b 8
+clearscreen:    lda #$20
+                ldx #$00
+is_loop:        sta $0400,x
+                sta $0500,x
+                sta $0600,x
+                sta $0700,x
+                inx
+                bne is_loop
+                rts
+				
